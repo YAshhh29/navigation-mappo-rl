@@ -1,25 +1,24 @@
-# Multi Agent Navigation
+# Obstacle RL: David Silver Course Implementation
 
 ![Multi Agent Navigation Demo](images/marl1.gif)
 
 ## Project Description
 The core RL task involves multiple agents (represented as colored circles and arrow-heads) navigating from their starting positions to their respective end goals while avoiding collisions with other agents and static obstacles. 
 
-To do this, we are using a CTDE (Centralized Training Decentralized Execution) approach to train agents. Specifically, we are using MAPPO (Multi-Agent Proximal Policy Optimization), a variant of PPO inspired by MADDPG.
+This project was built to demonstrate a deep, conceptual understanding of the foundational Reinforcement Learning algorithms taught in **David Silver's 2015 DeepMind RL Course**. By stripping away advanced modern techniques, the repository directly applies the core principles from his lectures to a continuous-space multi-agent environment.
 
+*Note: The environment and original base code for this project are highly inspired by and adapted from the excellent "Neural Breakdown with AVB" YouTube channel and their `navigation-mappo-rl` repository.*
 
-# Video Tutorial
+### Core Course Concepts Implemented:
+1. **Value Function Approximation (Lecture 6):** An implementation of a Decentralized Critic Network using a Multi-Layer Perceptron (MLP) to estimate state-values for advantage bootstrapping.
+2. **Policy Gradients (Lecture 7):**
+    - **REINFORCE (Monte Carlo Policy Gradient):** A pure Monte Carlo approach that bootstraps using the full episode returns to update the actor network.
+    - **Advantage Actor-Critic (A2C):** Uses Temporal Difference (TD) learning, bootstrapping the Value Function via a Critic Network to estimate advantages and train the Actor policy with less variance.
 
-> **📺 Watch the Video for free**  
-> **[Training RL Agents to Navigate as a Team](https://youtu.be/Ji5VTbH7i08)**  
+# Original Video Tutorial Reference
 
-## Support
-
-If you find this content helpful, please consider supporting my work on Patreon. Your support helps me create more in-depth tutorials and content. 
-
-Patreon members also get access to a code walkthrough of this repo.
-
-[<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" alt="Become a Patron!" width="200">](https://www.patreon.com/NeuralBreakdownwithAVB)
+> **📺 Watch the original Environment Video**
+> **[Training RL Agents to Navigate as a Team](https://youtu.be/Ji5VTbH7i08)**
 
 ## Getting Started
 
@@ -43,13 +42,15 @@ Patreon members also get access to a code walkthrough of this repo.
     ```
 
 3.  **Train a new model:**
+    You can train using either A2C (Actor-Critic) or REINFORCE (Monte Carlo Policy Gradient):
     ```bash
-    uv run train_mappo.py model_id configs/config.yaml
+    uv run train_a2c.py model_id configs/config.yaml
+    uv run train_reinforce.py model_id configs/config.yaml
     ```
 
     For example:
     ```bash
-    uv run train_mappo.py model_1 configs/basic_env.yaml
+    uv run train_a2c.py model_1 configs/basic_env.yaml
     ```
 
     This will create a new model inside `models/model_1`. The latest model and the best all-time models are both saved.
@@ -104,9 +105,9 @@ Key components of a configuration file:
 
 For reference, check `configs/basic_env.yaml` for a simple setup or `configs/moving_env.yaml` for dynamic obstacles.
 
-## MAPPO Configuration
+## Training Configuration
 
-The training configuration and hyperparameters are defined in `train_mappo.py`.
+The training configuration and hyperparameters are defined in `train_a2c.py` and `train_reinforce.py`.
 
 Key settings include:
 - **History Length**: `history_length = 4` (Number of past frames stacked).
@@ -115,7 +116,7 @@ Key settings include:
 - **Inference Interval**: `inference_interval=5` (How often to run evaluation episodes).
 - **Network Architecture**: The policy network uses an `ObservationEncoder` which processes LIDAR data and agent states, outputting a feature vector of size 384.
 
-To modify these, edit the `MAPPO` initialization in `train_mappo.py`.
+To modify these, edit the initialization in the respective training scripts.
 
 ## Rendering
 
@@ -154,26 +155,22 @@ The reward function incentivizes reaching the goal while avoiding collisions:
 
 ## Network Architecture
 
-The model architecture (found in `rl/mappo.py` and `networks/actor_critic_network.py`) implements the Actor-Critic method with shared features.
+The model architecture implements core concepts from David Silver's RL course.
 
 ### Shared Observation Encoder (`ObservationEncoder`)
-Both the Actor and Critic networks share a common backbone called the `ObservationEncoder`. This ensures that feature extraction from the raw environment state is consistent and efficient.
+Extracts features from the raw environment state (shared across both Actor and Critic in A2C).
 - **Input**: Takes the agent's observation, which includes stacked history frames.
 - **Structure**: 
-    - **1D CNN**: Processes the LIDAR data (which is treated as a 1D sequence of ray intersections).
-    - **Agent Network (MLP)**: Processes the scalar agent states (velocity, distance to goal, etc.).
-    - **Dense Layer**: Concatenates the outputs of the CNN and the MLP to produce a unified feature vector (default dimension 384).
+    - **1D CNN**: Processes the LIDAR data.
+    - **Agent Network (MLP)**: Processes scalar agent states (velocity, distance to goal, etc.).
 
-### Centralized Critic (`CentralizedCriticNetwork`)
-The critic evaluates the value of a state for **all agents**, making it "centralized". 
-- **Attention Mechanism**: It uses a Multi-Head Attention (MHA) layer to process the states of all agents. By attending to other agents' encoded states, the critic can learn cooperative behaviors and anticipate interactions.
-- **Output**: A single scalar value representing the estimated return (value) of the global state.
-
-Currently the environment also has a "state" function, but we are not using it, left for future work.
-
+### Decentralized Critic (`DecentralizedCriticNetwork` in A2C)
+Reflects the Value Function Approximation theory (Lecture 6). The critic evaluates the value of a state for an individual agent.
+- **Input**: State feature vector from `ObservationEncoder`.
+- **Structure**: Multi-Layer Perceptron.
+- **Output**: Scalar state-value estimate.
 
 ### Decentralized Actor (`DecentralizedActorNetwork`)
-The actor decides the action for a **single agent**, making it "decentralized" during execution.
-- **Input**: Takes the shared feature vector from the `ObservationEncoder`.
-- **Structure**: A standard MLP (Multi-Layer Perceptron) that maps features to action probabilities.
-- **Output**: A probability distribution (Diagonal Gaussian) over the action space, from which the agent samples its movement commands.
+Implements the continuous-action Policy Network (Lecture 7).
+- **Input**: Feature vector from the `ObservationEncoder`.
+- **Output**: Probability distribution (Diagonal Gaussian) over the action space, from which the agent samples movement commands.
